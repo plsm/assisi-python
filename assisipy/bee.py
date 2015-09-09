@@ -105,7 +105,6 @@ class Bee:
         self.__object_readings = dev_msgs_pb2.ObjectArray()
         self.__encoder_readings = dev_msgs_pb2.DiffDrive()
         self.__true_pose = base_msgs_pb2.PoseStamped()
-        self.__light_readings = base_msgs_pb2.ColorStamped()
         self.__temp_readings = dev_msgs_pb2.TemperatureArray()
         self.__vel_setpoints = dev_msgs_pb2.DiffDrive()
         self.__color_setpoint = base_msgs_pb2.ColorStamped()
@@ -165,13 +164,6 @@ class Bee:
                 elif cmd == 'VelRef':
                     with self.__lock:
                         self.__vel_setpoints.ParseFromString(data)
-                else:
-                    print('Unknown command {0} for Bee {1}'.format(cmd, self.__name))
-            ### Light sensors ###
-            elif dev == 'Light':
-                if cmd == 'Readings':
-                    with self.__lock:
-                        self.__light_readings.ParseFromString(data)
                 else:
                     print('Unknown command {0} for Bee {1}'.format(cmd, self.__name))
 
@@ -280,17 +272,6 @@ class Bee:
         Returns the vibration amplitude of sensor id.
         """
         pass
-
-    def get_light_rgb(self, id = LIGHT_SENSOR):
-        """
-        :return: (r,g,b) tuple, representing the light intensities at
-                 red, green and blue wavelengths (currently, the sensor
-                 reports only blue intensity, r and g are always 0).
-        """
-        with self.__lock:
-            return (self.__light_readings.color.red,
-                    self.__light_readings.color.green,
-                    self.__light_readings.color.blue)
 
     def get_airflow_intensity(self, id = 0):
         """

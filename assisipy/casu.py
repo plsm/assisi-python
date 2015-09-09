@@ -461,39 +461,6 @@ class Casu:
         self.__write_to_log(["speaker_freq_intens", time.time(), 0, 0])
 
 
-    def set_light_rgb(self, r = 0, g = 0, b = 0, id = LIGHT_ACT):
-        """
-        Set the color and intensity of the light actuator.
-        Automatically turns the actuator on.
-
-        :param float r: Red component intensity, between 0 and 1.
-        :param float g: Green component intensity, between 0 and 1.
-        :param float b: Blue component intensity, between 0 and 1.
-        """
-        # Limit values to [0,1] range
-        r = sorted([0, r, 1])[1]
-        g = sorted([0, g, 1])[1]
-        b = sorted([0, b, 1])[1]
-        light = base_msgs_pb2.ColorStamped()
-        light.color.red = r
-        light.color.green = g
-        light.color.blue = b
-        self.__pub.send_multipart([self.__name, "Light", "On",
-                                   light.SerializeToString()])
-        self.__write_to_log(["light_ref", time.time(), r, g, b])
-
-    def light_standby(self, id = LIGHT_ACT):
-        """
-        Turn the light actuator off.
-        """
-        light = base_msgs_pb2.ColorStamped()
-        light.color.red = 0
-        light.color.green = 0
-        light.color.blue = 0
-        self.__pub.send_multipart([self.__name, "Light", "Off",
-                                   light.SerializeToString()])
-        self.__write_to_log(["light_ref", time.time(), 0, 0, 0])
-
     def set_diagnostic_led_rgb(self, r = 0, g = 0, b = 0, id = DLED_TOP):
         """
         Set the diagnostic LED light color. Automatically turns the actuator on.
