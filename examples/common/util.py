@@ -37,7 +37,8 @@ def create_long_wall (simctrl, x, y, yaw, color):
     wall_id += 1
 
 def similar_colour (colour, target, epsilon = 0.1):
-    r, g, b = target
-    return math.fabs (colour.red   - r) < epsilon \
-       and math.fabs (colour.green - g) < epsilon \
-       and math.fabs (colour.blue  - b) < epsilon
+    r0, g0, b0 = colour
+    r1, g1, b1 = target
+    return math.fabs (r0 - r1) < epsilon \
+       and math.fabs (g0 - g1) < epsilon \
+       and math.fabs (b0 - b1) < epsilon

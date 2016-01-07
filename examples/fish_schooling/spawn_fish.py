@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-A simulation environment with two rooms and several fish.
+A simulation environment with two circular rooms and several fish.
 """
 
 import common
@@ -69,9 +69,9 @@ def spawn_control_fish (simctrl):
     fishName = 'Fish-002'
     simctrl.spawn ('Fish', fishName, (x, y, yaw))
 
-def build_rooms (simctrl):
+def build_circular_rooms (simctrl):
     """
-    Create two rooms along the x axis joined by a small corridor.
+    Create two circular rooms along the x axis joined by a small corridor.
     """
     numberWalls = 66
     openingSize = 6
@@ -130,7 +130,7 @@ args = parser.parse_args ()
 compute_room_specs (int (args.arena_radius))
 
 simctrl = sim.Control()
-build_rooms (simctrl)
+build_circular_rooms (simctrl)
 build_spots (simctrl)
 #spawn_control_fish (simctrl)
 print 'Spawned', spawn_fish (simctrl, int (args.number_fish)), 'fish for a target of', args.number_fish
