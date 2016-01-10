@@ -41,7 +41,7 @@ nosetests.xml
 .#*
 
 # Generated message files
-#assisipy/msg/*pb2.py
+assisipy/msg/*pb2.py
 
 # Doc output folder
 doc/latex
