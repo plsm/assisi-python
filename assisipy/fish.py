@@ -238,7 +238,7 @@ class Fish:
                     self.__light_readings.color.blue)
 
 
-    def set_color(self,r=0.2,g=0.2,b=0.5):
+    def set_color(self, r=0.5, g=0.5, b=0.6):
         """
         Set the color of the fish. This can be useful for diagnostic and
         demonstration purposes.
@@ -318,11 +318,30 @@ class Fish:
                self.__color_setpoint.color.green,
                self.__color_setpoint.color.blue)
 
-    def get_eye (self, id):
+    def get_pixel (self, side, index):
         """
-        :return: the image seen from one of the eyes
+        :return: the pixel information seen from one of the eyes
         """
-        if id == LEFT_EYE:
-            return self.__left_eye
-        elif id == RIGHT_EYE:
-            return self.__right_eye
+        colour = None
+        distance = None
+        with self.__lock:
+            if side == LEFT_EYE:
+                c = self.__left_eye.pixel [index]
+                colour = (p.red, p.green, p.blue)
+                distance = self.__left_eye.distance [index]
+            elif side == RIGHT_EYE:
+                c = self.__right_eye.pixel [index]
+                colour = (p.red, p.green, p.blue)
+                distance = self.__right_eye.distance [index]
+        return (colour, distance)
+
+    def get_pixels (self):
+        """
+        :return: two lists containing the pixel colour and distance from the two eyes
+        """
+        with self.__lock:
+            colours = [(c.red, c.green, c.blue) for c in self.__left_eye.pixel] \
+                    + [(c.red, c.green, c.blue) for c in self.__right_eye.pixel]
+            distances = [d for d in self.__left_eye.distance] \
+                      + [d for d in self.__right_eye.distance]
+        return (colours, distances)

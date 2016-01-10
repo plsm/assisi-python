@@ -20,25 +20,47 @@ DW = 50
 threshold distance determining the interaction with the walls
 """
 
-K0 = 6.3
+KAPPA_0 = 6.3
 """
 dispertion parameter associated with the basic-swimming behaviour
 """
 
-KW = 20
+KAPPA_W = 20
 """
 dispertion parameter associated with the wall-following behaviour
 """
 
-KF = 2
+KAPPA_F = 2
 
+KAPPA_S = 20
 
-I0K0 = scipy.special.i0 (K0)
+I0K0 = scipy.special.i0 (KAPPA_0)
 
-I0KW = scipy.special.i0 (KW)
+I0KW = scipy.special.i0 (KAPPA_W)
 
-I0KF = scipy.special.i0 (KF)
+I0KF = scipy.special.i0 (KAPPA_F)
 
+I0KS = scipy.special.i0 (KAPPA_S)
+
+ALPHA_0 = 55
+"""
+Weight of other fish on a focal fish distant from any wall.
+"""
+
+ALPHA_W = 20
+"""
+Weight of other fish on a focal fish near a wall
+"""
+
+BETA_0 = 0.15
+"""
+Weight of a spot of interest on a focal fish distant from any wall.
+"""
+
+BETA_W = 0.01
+"""
+Weight of a spot of interest on a focal fish near a wall.
+"""
 
 CAMERA_FIELD_OF_VIEW = 3 * math.pi / 4
 
@@ -101,6 +123,8 @@ class SchoolingVisual (Thread):
         self.sumSolidAngles_Spots = 0
         self.sumSolidAngles_Fish = 0
         self.nearWall = False
+        self.alpha = -1
+        self.beta = -1
 
     def update (self):
         """
@@ -125,13 +149,14 @@ class SchoolingVisual (Thread):
 
         The eyes are modeled by circular cameras that provide colour and distance information of perceived objects.
         """
-        self.eye_distance = []
-        self.eye_pixel = []
-        for eye in [fish.LEFT_EYE, fish.RIGHT_EYE]:
-            for d in self._fish.get_eye (eye).distance:
-                self.eye_distance.append (d)
-            for p in self._fish.get_eye (eye).pixel:
-                self.eye_pixel.append (p)
+        self.eye_pixel, self.eye_distance = self._fish.get_pixels ()
+#        self.eye_distance = []
+#        self.eye_pixel = []
+#        for eye in [fish.LEFT_EYE, fish.RIGHT_EYE]:
+#            for d in self._fish.get_eye (eye).distance:
+#                self.eye_distance.append (d)
+#            for p in self._fish.get_eye (eye).pixel:
+#                self.eye_pixel.append (p)
         if len (self.eye_pixel) != 2 * CAMERA_PIXEL_COUNT:
             print "??!!!#@*!", len (self.eye_pixel), " = ", len (self._fish.get_eye (fish.LEFT_EYE).pixel), " + ", len (self._fish.get_eye (fish.RIGHT_EYE).pixel), \
               ' distance ', len (self.eye_distance), " = ", len (self._fish.get_eye (fish.LEFT_EYE).distance), " + ", len (self._fish.get_eye (fish.RIGHT_EYE).distance)
@@ -145,11 +170,21 @@ class SchoolingVisual (Thread):
         Compute the probability distribution function that is used to calculate the angle the fish turns to.
 
         The probability distribution function is stored has a list of integers.
+        
+        Divide the Probability Distribution Function after its components have been computed.
         """
         self.pdf_vector = [0 for x in range (PDF_VECTOR_SIZE)]
         self.pdf_f0 ()
+        if self.nearWall:
+            self.alpha = ALPHA_W
+            self.beta = BETA_W
+        else:
+            self.alpha = ALPHA_0
+            self.beta = BETA_0
         self.pdf_fF ()
         self.pdf_fS ()
+        for index in range (PDF_VECTOR_SIZE):
+            self.pdf_vector [index] /= 1 + self.alpha * self.sumSolidAngles_Fish + self.beta * self.sumSolidAngles_Spots
 
     def sample_pdf (self):
         """
@@ -253,7 +288,7 @@ class SchoolingVisual (Thread):
         if not self.nearWall:
             for index in range (PDF_VECTOR_SIZE):
                 self.pdf_vector [index] += \
-                  math.exp (K0 * math.cos (angle)) \
+                  math.exp (KAPPA_0 * math.cos (angle)) \
                   / (2 * math.pi * I0K0)
                 angle += PDF_VECTOR_SLOT_ANGLE
         else:
@@ -261,8 +296,8 @@ class SchoolingVisual (Thread):
             wallAngle2 = angleClosestWall - math.pi / 2
             for index in range (PDF_VECTOR_SIZE):
                 self.pdf_vector [index] += \
-                    (math.exp (K0 * math.cos (angle - wallAngle1)) \
-                    + math.exp (K0 * math.cos (angle - wallAngle2))) \
+                    (math.exp (KAPPA_W * math.cos (angle - wallAngle1)) \
+                    + math.exp (KAPPA_W * math.cos (angle - wallAngle2))) \
                     / (2 * 2 * math.pi * I0K0)
                 angle += PDF_VECTOR_SLOT_ANGLE
 
@@ -270,51 +305,16 @@ class SchoolingVisual (Thread):
         """
         Compute the Probability Distribution Function fF(theta) for perceived fish.
         """
-        # sumSolidAngles = 0
-        # anglesPerceivedFish = []
-        # currentFishRun_MaxDistance = None
-        # currentFishRun_MinDistance = None
-        # currentFishRun_StartAngle = None
-        # def addCurrentFishRun (endAngle):
-        #     global currentFishRun_StartAngle
-        #     global anglesPerceivedFish
-        #     micro = (currentFishRun_StartAngle + endAngle) / 2
-        #     solidAngle = currentFishRun_StartAngle - endAngle
-        #     t = (micro, solidAngle)
-        #     anglesPerceivedFish.append (t)
-        #     currentFishRun_StartAngle = None
-        #     sumSolidAngles += solidAngle
-        
-        # angle = CAMERA_FIELD_OF_VIEW
-        # step = -CAMERA_FIELD_OF_VIEW / CAMERA_PIXEL_COUNT
-        # for index in range (2 * CAMERA_PIXEL_COUNT):
-        #     if self.is_fish (index):
-        #         if currentFishRun_StartAngle != None \
-        #            and max (currentFishRun_MaxDistance, self.eye_distance [index]) - min (currentFishRun_MinDistance, self.eye_distance [index]) > FISH_DISTANCE_THRESHOLD:
-        #             addCurrentFishRun (angle - step)
-        #         if currentFishRun_StartAngle == None:
-        #             currentFishRun_StartAngle = angle
-        #             currentFishRun_MaxDistance = self.eye_distance [index]
-        #             currentFishRun_MinDistance = self.eye_distance [index]
-        #         else:
-        #             currentFishRun_MaxDistance = max (currentFishRun_MaxDistance, self.eye_distance [index])
-        #             currentFishRun_MinDistance = min (currentFishRun_MinDistance, self.eye_distance [index])
-        #     elif currentFishRun_StartAngle != None:
-        #         addCurrentFishRun (angle - step)
-        #     angle += step
-        # if currentFishRun_StartAngle != None:
-        #     addCurrentFishRun (angle - step)
-
         perceivedFish, self.sumSolidAngles_Fish = self.computeObjects (self.is_fish, FISH_DISTANCE_THRESHOLD)
         if perceivedFish != []:
             angle = -math.pi
             for index in range (PDF_VECTOR_SIZE):
-                for (micro, solidAngle) in perceivedFish:
+                for (mu, solidAngle) in perceivedFish:
                     self.pdf_vector [index] += \
-                        solidAngle \
-                        * math.exp (KF * math.cos (angle - micro)) \
-                        / (2 * math.pi * I0KF) \
-                        / self.sumSolidAngles_Fish
+                        self.alpha \
+                        * solidAngle \
+                        * math.exp (KAPPA_F * math.cos (angle - mu)) \
+                        / (2 * math.pi * I0KF)
                 angle += PDF_VECTOR_SLOT_ANGLE
 
     def pdf_fS (self):
@@ -325,15 +325,15 @@ class SchoolingVisual (Thread):
         if perceivedSpots != []:
             angle = -math.pi
             for index in range (PDF_VECTOR_SIZE):
-                for (micro, solidAngle) in perceivedSpots:
+                for (mu, solidAngle) in perceivedSpots:
                     self.pdf_vector [index] += \
-                        solidAngle \
-                        * math.exp (KF * math.cos (angle - micro)) \
-                        / (2 * math.pi * I0KF) \
-                        / self.sumSolidAngles_Spots
+                        self.beta \
+                        * solidAngle \
+                        * math.exp (KAPPA_S * math.cos (angle - mu)) \
+                        / (2 * math.pi * I0KS)
                 angle += PDF_VECTOR_SLOT_ANGLE
 
-
+            
     def computeObjects (self, isObjectFunction, objectThreshold):
         """
         Process camera data and return a list with perceived objects.
@@ -357,9 +357,9 @@ class SchoolingVisual (Thread):
             global perceivedObjects
             global currentObjectRun_OnFlag
             global sumSolidAngles
-            micro = (currentObjectRun_StartAngle + endAngle) / 2
+            mu = (currentObjectRun_StartAngle + endAngle) / 2
             solidAngle = currentObjectRun_StartAngle - endAngle + PDF_VECTOR_SLOT_ANGLE
-            t = (micro, solidAngle)
+            t = (mu, solidAngle)
             perceivedObjects.append (t)
             currentObjectRun_OnFlag = False
             sumSolidAngles += solidAngle
