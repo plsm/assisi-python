@@ -106,7 +106,7 @@ class Bee:
         self.__encoder_readings = dev_msgs_pb2.DiffDrive()
         self.__true_pose = base_msgs_pb2.PoseStamped()
         self.__light_readings = base_msgs_pb2.ColorStamped()
-        self.__temp_readings = dev_msgs_pb2.TemperatureArray()
+        self.__temp_readings = dev_msgs_pb2.TemperatureWithGradient()
         self.__vel_setpoints = dev_msgs_pb2.DiffDrive()
         self.__color_setpoint = base_msgs_pb2.ColorStamped()
         self.__airflow_reading = dev_msgs_pb2.AirflowReading()
@@ -266,7 +266,14 @@ class Bee:
         Returns the temperature reading of sensor id.
         """
         with self.__lock:
-            return self.__temp_readings.temp[id - TEMP_SENSOR]
+            return self.__temp_readings.temp
+
+    def get_temp_gradient (self):
+        """
+        Returns the temperature reading of sensor id.
+        """
+        with self.__lock:
+            return (self.__temp_readings.dtx, self.__temp_readings.dty)
         
 
     def get_vibration_frequency(self, id):
