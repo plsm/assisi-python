@@ -326,13 +326,13 @@ class Fish:
         distance = None
         with self.__lock:
             if side == LEFT_EYE:
-                c = self.__left_eye.pixel [index]
+                c = self.__left_eye.image [index]
                 colour = (p.red, p.green, p.blue)
-                distance = self.__left_eye.distance [index]
+                distance = self.__left_eye.zbuffer [index]
             elif side == RIGHT_EYE:
-                c = self.__right_eye.pixel [index]
+                c = self.__right_eye.image [index]
                 colour = (p.red, p.green, p.blue)
-                distance = self.__right_eye.distance [index]
+                distance = self.__right_eye.zbuffer [index]
         return (colour, distance)
 
     def get_pixels (self):
@@ -340,8 +340,8 @@ class Fish:
         :return: two lists containing the pixel colour and distance from the two eyes
         """
         with self.__lock:
-            colours = [(c.red, c.green, c.blue) for c in self.__left_eye.pixel] \
-                    + [(c.red, c.green, c.blue) for c in self.__right_eye.pixel]
-            distances = [d for d in self.__left_eye.distance] \
-                      + [d for d in self.__right_eye.distance]
+            colours = [(c.red, c.green, c.blue) for c in self.__left_eye.image] \
+                    + [(c.red, c.green, c.blue) for c in self.__right_eye.image]
+            distances = [d for d in self.__left_eye.zbuffer] \
+                      + [d for d in self.__right_eye.zbuffer]
         return (colours, distances)
