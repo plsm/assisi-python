@@ -14,69 +14,63 @@ import random
 import time
 from threading import Thread, Event
 
-
 DW = 50
-"""
-threshold distance determining the interaction with the walls
-"""
+"""Threshold distance determining the interaction with the walls."""
 
 KAPPA_0 = 6.3
-"""
-dispertion parameter associated with the basic-swimming behaviour
-"""
+"""Dispertion parameter associated with the basic-swimming behaviour."""
 
 KAPPA_W = 20
-"""
-dispertion parameter associated with the wall-following behaviour
-"""
+"""Dispertion parameter associated with the wall-following behaviour."""
 
 KAPPA_F = 2
+"""Measure of concentration of perceived fish."""
 
 KAPPA_S = 20
+"""Dispertion parameter associated with perceived spots."""
 
 I0K0 = scipy.special.i0 (KAPPA_0)
+"""Modified Bessel function of first kind of order zero used with basic-swimming behaviour."""
 
 I0KW = scipy.special.i0 (KAPPA_W)
+"""Modified Bessel function of first kind of order zero used with wall-swimming behaviour."""
 
 I0KF = scipy.special.i0 (KAPPA_F)
+"""Modified Bessel function of first kind of order zero used with perceived fish."""
 
 I0KS = scipy.special.i0 (KAPPA_S)
+"""Modified Bessel function of first kind of order zero used with spots of interest."""
 
 ALPHA_0 = 55
-"""
-Weight of other fish on a focal fish distant from any wall.
-"""
+"""Weight of other fish on a focal fish distant from any wall."""
 
 ALPHA_W = 20
-"""
-Weight of other fish on a focal fish near a wall
-"""
+"""Weight of other fish on a focal fish near a wall."""
 
 BETA_0 = 0.15
-"""
-Weight of a spot of interest on a focal fish distant from any wall.
-"""
+"""Weight of a spot of interest on a focal fish distant from any wall."""
 
 BETA_W = 0.01
-"""
-Weight of a spot of interest on a focal fish near a wall.
-"""
+"""Weight of a spot of interest on a focal fish near a wall."""
 
 CAMERA_FIELD_OF_VIEW = 3 * math.pi / 4
+"""Field of view of each fish eye."""
 
 CAMERA_PIXEL_COUNT = 10
+"""
+Number of pixels of circular camera used by fish.
+
+This should be equal to the value used by the playground.
+"""
 
 PDF_VECTOR_SIZE = 36
-"""
-Vector size that contains the discretization of Probability Distribution Function.
-"""
+"""Size of the vector that contains the discretization of probability density function."""
 
 PDF_VECTOR_SLOT_ANGLE = 2 * math.pi / PDF_VECTOR_SIZE
-"""
-Angle covered by a slot of the discretization of Probability Distribution Function.
-"""
+"""Angle covered by a slot of the discretization of probability density function."""
 
 SPOT_DISTANCE_THRESHOLD = 50
+"""."""
 
 FISH_DISTANCE_THRESHOLD = 50
 
@@ -88,11 +82,30 @@ currentObjectRun_OnFlag = False
 sumSolidAngles = 0
 
 
-KILL = False
-
 class SchoolingVisual (Thread):
     """
-    A demo fish schooling controller
+    Fish controller based on Bertrand's model.
+
+    The model is described in the paper
+    
+    Bertrand Collignon, Axel S\'eguret, and Jos\'e Halloy, Zebrafish
+    collective behaviour in heterogeneous environment modeled by a
+    stochastic model based on visual perception
+
+    available at
+    http://arxiv.org/abs/1509.01448
+
+    The eyes are modeled by circular cameras that provide colour and
+    distance information of perceived objects.  The two circular cameras
+    cover a field of view of 270º.  The image provided by the cameras is
+    stored in attributes eye_distance and eye_pixel.  These atributes are
+    lists of lenght 2*CAMERA_PIXEL_COUNT.  The data contained in these
+    lists is used to compute probability density functions (PD) for basic
+    swiming behaviour, wall following behaviour, following other fish, and
+    going to spots of interest.  The final discretised PDF is stored in
+    attribute pdf_vector, a list of size PDF_VECTOR_SIZE.  A sample angle
+    (constrained to the maximum turning angle of fish) is taken which is
+    then converted to left and right motor velocities.
     """
 
     def __init__ (self, fish_name, event):
@@ -101,20 +114,13 @@ class SchoolingVisual (Thread):
         self.stopped = event
 
         self._fish = fish.Fish (name = fish_name)
-        self._turned = 0.0
 
         self.v_straight = 4.0
         self.turn = 0
-        self.v_turn = 0.2
-        self.v_diff = 0.7
 
         self.Td = 0.3
-        self.vision_update_rate = 10 # Output eyes readings every 10*Td
-        self._update_count = 0
 
         (x, y, yaw) = self._fish.get_true_pose ()
-        self._yaw = yaw
-        self._turned = 0.0
         
         self.eye_distance = []
         self.eye_pixel = []
@@ -130,48 +136,33 @@ class SchoolingVisual (Thread):
         """
         Update the fish state.
 
-        Print debug information to standard output, compute the next state, and execute the state's action.
-        
+        Print debug information to standard output, compute the next state,
+        and execute the state's action.
         """
         self.compute_eye_data ()
         self.compute_pdf ()
         self.sample_pdf ()
         self.swim ()
-        global KILL
-        if KILL:
-            sys.exit ()
-
-
 
     def compute_eye_data (self):
         """
-        Calculate lists eye_distance and eye_pixel from the data collected by the two eyes.
+        Calculate lists eye_distance and eye_pixel from the data collected
+        by the two eyes.
 
-        The eyes are modeled by circular cameras that provide colour and distance information of perceived objects.
+        The eyes are modeled by circular cameras that provide colour and
+        distance information of perceived objects.
         """
         self.eye_pixel, self.eye_distance = self._fish.get_pixels ()
-#        self.eye_distance = []
-#        self.eye_pixel = []
-#        for eye in [fish.LEFT_EYE, fish.RIGHT_EYE]:
-#            for d in self._fish.get_eye (eye).distance:
-#                self.eye_distance.append (d)
-#            for p in self._fish.get_eye (eye).pixel:
-#                self.eye_pixel.append (p)
-        if len (self.eye_pixel) != 2 * CAMERA_PIXEL_COUNT:
-            print "??!!!#@*!", len (self.eye_pixel), " = ", len (self._fish.get_eye (fish.LEFT_EYE).pixel), " + ", len (self._fish.get_eye (fish.RIGHT_EYE).pixel), \
-              ' distance ', len (self.eye_distance), " = ", len (self._fish.get_eye (fish.LEFT_EYE).distance), " + ", len (self._fish.get_eye (fish.RIGHT_EYE).distance)
-#        print self.eye_pixel [0].red, self.eye_pixel [0].green, self.eye_pixel [0].blue
-#        print self.eye_distance
-#        print self._fish.get_eye (fish.LEFT_EYE)
 
 
     def compute_pdf (self):
         """
-        Compute the probability distribution function that is used to calculate the angle the fish turns to.
+        Compute the probability density function that is used to calculate
+        the angle the fish turns to.
 
-        The probability distribution function is stored has a list of integers.
+        The probability density function is stored has a list of integers.
         
-        Divide the Probability Distribution Function after its components have been computed.
+        Divide the probability density function after its components have been computed.
         """
         self.pdf_vector = [0 for x in range (PDF_VECTOR_SIZE)]
         self.pdf_f0 ()
@@ -188,7 +179,8 @@ class SchoolingVisual (Thread):
 
     def sample_pdf (self):
         """
-        Sample an angle from the Probability Distribution Function and return a number between zero and PDF_VECTOR_SIZE.
+        Sample an angle from the probability density function and return a
+        number between zero and PDF_VECTOR_SIZE.
 
         The corresponding angle is given by
         
@@ -226,13 +218,9 @@ class SchoolingVisual (Thread):
 #        print 'index = %2d,  angle is %4dº,  motors %5.2f %5.2f' % (self.turn, math.degrees (-math.pi + self.turn * PDF_VECTOR_SLOT_ANGLE), lf, rf)
 
     def print_data (self):
-        stop = False
+        """Print fish state."""
         for p in self.pdf_vector:
-            if math.isnan (p):
-                print ' NaN'
-                stop = True
-            else:
-                print '%4d' % (int (100 * p)),
+            print '%4d' % (int (100 * p)),
         print
         print 'nearWall = ', self.nearWall, '  sumSolidAngles_Spots =', self.sumSolidAngles_Spots, ' sumSolidAngles_Fish =', self.sumSolidAngles_Fish
         if self.nearWall or True:
@@ -244,29 +232,39 @@ class SchoolingVisual (Thread):
             for c in self.eye_pixel:
                 print '%2d%2d%2d' % (int (10 * c.red), int (10 * c.green), int (10 * c.blue)),
             print
-        if stop:
-            str2 = raw_input ("escreve")
-            print str2
         
-    def is_wall (self, angle):
+    def is_wall (self, index):
         """
         Returns True if the fish perceives a wall at the following angle
         """
-        return util.similar_colour (self.eye_pixel [angle], common.WALL_COLOUR)
+        return util.similar_colour (self.eye_pixel [index], common.WALL_COLOUR)
     
-    def is_fish (self, angle):
+    def is_fish (self, index):
         """
-        Returns True if the fish perceives a fish at the following angle
+        Returns True if the fish perceives a fish at the given index.
+
+        Parameters
+           index -- index to list self.eye_pixel that contains colour
+           information.
         """
-        return util.similar_colour (self.eye_pixel [angle], common.FISH_COLOUR)
+        return util.similar_colour (self.eye_pixel [index], common.FISH_COLOUR)
 
     def is_spot (self, index):
+        """
+        Returns True if the fish perceis a spot at the pixel at the given index.
+
+        Parameters
+           index -- index to list self.eye_pixel that contains colour
+           information.
+        """
         return util.similar_colour (self.eye_pixel [index], common.SPOT_COLOUR)
 
 
     def pdf_f0 (self):
         """
-        Compute the PDF f0(theta) for a fish to move in each potential direction in a bounded tank without perceptible stimuli
+        Compute the probability density Function f0(theta) for a fish
+        to move in each potential direction in a bounded tank without
+        perceptible stimuli.
         """
         # see if the fish perceives a wall
         angle = CAMERA_FIELD_OF_VIEW
@@ -303,7 +301,7 @@ class SchoolingVisual (Thread):
 
     def pdf_fF (self):
         """
-        Compute the Probability Distribution Function fF(theta) for perceived fish.
+        Compute the probability density function fF(theta) for perceived fish.
         """
         perceivedFish, self.sumSolidAngles_Fish = self.computeObjects (self.is_fish, FISH_DISTANCE_THRESHOLD)
         if perceivedFish != []:
@@ -319,7 +317,7 @@ class SchoolingVisual (Thread):
 
     def pdf_fS (self):
         """
-        Compute the Probability Distribution Function for spots of interest.
+        Compute the probability density Function for spots of interest.
         """
         perceivedSpots, self.sumSolidAngles_Spots = self.computeObjects (self.is_spot, SPOT_DISTANCE_THRESHOLD)
         if perceivedSpots != []:
@@ -333,12 +331,20 @@ class SchoolingVisual (Thread):
                         / (2 * math.pi * I0KS)
                 angle += PDF_VECTOR_SLOT_ANGLE
 
-            
     def computeObjects (self, isObjectFunction, objectThreshold):
         """
-        Process camera data and return a list with perceived objects.
+        General method to process camera data and return a list with
+        perceived objects.
 
-        For each perceived object we return the angle where it was perceived and the opening angle of the perceived object.
+        For each perceived object we return the angle where it was
+        perceived and the opening angle of the perceived object.
+
+        Parameters
+           isObjectFunction -- function that classifies pixel colours.
+
+           objectThreshold -- if two adjacent pixels are classified as
+           objects they belong to different objects if the corresponding
+           distance is higher than this threshold.
         """
         # python 2.x hack
         global currentObjectRun_StartAngle
@@ -387,6 +393,7 @@ class SchoolingVisual (Thread):
         return (perceivedObjects, sumSolidAngles)
     
     def run (self):
+        """Main function that runs the fish behaviour"""
         # Run update every Td
         while not self.stopped.wait (self.Td):
             self.update ()
