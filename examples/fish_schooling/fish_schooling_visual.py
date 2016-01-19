@@ -74,7 +74,11 @@ SPOT_DISTANCE_THRESHOLD = 50
 
 FISH_DISTANCE_THRESHOLD = 50
 
-MAXIMUM_TURNING_ANGLE = math.pi / 2
+MAXIMUM_TURNING_ANGLE = 90
+
+PDF_VECTOR_INDEX_FROM = 0
+
+PDF_VECTOR_INDEX_TO = 0
 
 ## python 2.x quircks ...
 perceivedObjects = []
@@ -82,6 +86,13 @@ currentObjectRun_StartAngle = None
 currentObjectRun_OnFlag = False
 sumSolidAngles = 0
 
+def compute_parameters ():
+    """Compute fish behaviour parameters that depend on parameters set up on the command line."""
+    global PDF_VECTOR_INDEX_FROM
+    global PDF_VECTOR_INDEX_TO
+    aperture = int (MAXIMUM_TURNING_ANGLE * PDF_VECTOR_SIZE / 360)
+    PDF_VECTOR_INDEX_FROM = PDF_VECTOR_SIZE / 2 - aperture
+    PDF_VECTOR_INDEX_TO = PDF_VECTOR_SIZE / 2 + aperture
 
 class SchoolingVisual:
     """
@@ -187,11 +198,13 @@ class SchoolingVisual:
         
         where index is the returned number.
         """
+        index = PDF_VECTOR_INDEX_FROM
         sumSlots = 0
-        for s in self.pdf_vector:
-            sumSlots += s
+        while index <= PDF_VECTOR_INDEX_TO:
+            sumSlots += self.pdf_vector [index]
+            index += 1
         rnd = sumSlots * random.random ()
-        index = 0
+        index = PDF_VECTOR_INDEX_FROM
         go = True
         sumSlots = 0
         while go:
@@ -218,18 +231,22 @@ class SchoolingVisual:
 
     def print_data (self):
         """Print fish state."""
-        for p in self.pdf_vector:
-            print '%4d' % (int (100 * p)),
-        print
-        print 'nearWall = ', self.nearWall, '  sumSolidAngles_Spots =', self.sumSolidAngles_Spots, ' sumSolidAngles_Fish =', self.sumSolidAngles_Fish
-        if self.nearWall or True:
+        index = PDF_VECTOR_INDEX_FROM
+        while index <= PDF_VECTOR_INDEX_TO:
+            if self.turn == index:
+                print '[%4d]' % (int (self.pdf_vector [index])),
+            else:
+                print ' %4d ' % (int (self.pdf_vector [index])),
+            index += 1
+        print ' nearWall = ', self.nearWall, '  sumSolidAngles_Spots =', self.sumSolidAngles_Spots, ' sumSolidAngles_Fish =', self.sumSolidAngles_Fish
+        if self.nearWall and False:
             print 'dista',
             for d in self.eye_distance:
                 print '%6d' % (int (d)),
             print
             print 'pixel',
-            for c in self.eye_pixel:
-                print '%2d%2d%2d' % (int (10 * c.red), int (10 * c.green), int (10 * c.blue)),
+            for (red, green, blue) in self.eye_pixel:
+                print '%2d%2d%2d' % (int (10 * red), int (10 * green), int (10 * blue)),
             print
         
     def is_wall (self, index):
@@ -397,6 +414,7 @@ class SchoolingVisual:
             # Run update every Td
             time.sleep (self.Td)
             self.update ()
+            self.print_data ()
 
     def _cleanup (self):
         self._fish.set_vel (0.0, 0.0)
@@ -413,12 +431,23 @@ if __name__ == '__main__':
     # Parse command line arguments for fish name
     parser = argparse.ArgumentParser (
         description = 'A simple fish wander controller. Fish moves in straight sinusoidal lines until it encounters an obstacle ahead. It turns about 180 degrees to clear the obstacle, and then continues in a straight line.')
-    parser.add_argument (
-        '--fish_name',
-        help = 'Fish name',
-        default = 'Fish-001')
+    parser.add_argument ('--fish_name',  help = 'Fish name', default = 'Fish-001')
+    parser.add_argument ('--max-turn-angle', type = int,  help = 'Fish maximum turning angle (in degrees)', default = MAXIMUM_TURNING_ANGLE)
+    parser.add_argument ('--pdf-vector-size', type = int, help = 'Size of the vector that contains the discretization of probability density function', default = PDF_VECTOR_SIZE)
+    parser.add_argument ('--alpha-0', type = float, help = 'Weight of other fish on a focal fish distant from any wall', default = ALPHA_0)
+    parser.add_argument ('--alpha-w', type = float, help = 'Weight of other fish on a focal fish near a wall', default = ALPHA_W)
+    parser.add_argument ('--beta-0',  type = float, help = 'Weight of a spot of interest on a focal fish distant from any wall', default = BETA_0)
+    parser.add_argument ('--beta-w',  type = float, help = 'Weight of a spot of interest on a focal fish near a wall')
     args = parser.parse_args ()
-
+    # set up behaviour parameters
+    MAXIMUM_TURNING_ANGLE = args.max_turn_angle
+    PDF_VECTOR_SIZE = args.pdf_vector_size
+    ALPHA_0 = args.alpha_0
+    ALPHA_W = args.alpha_w
+    BETA_0 = args.beta_0
+    BETA_W = args.beta_w
+    compute_parameters ()
+    # wait a few seconds
     for i in range (2, 0, -1):
         print 'The fish controller will start in {0} seconds...\r'.format (i),
         sys.stdout.flush ()
