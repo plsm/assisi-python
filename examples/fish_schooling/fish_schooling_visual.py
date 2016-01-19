@@ -6,13 +6,13 @@ from assisipy import fish
 import util
 import common
 
-import sys # For flushing the output buffer
+import sys
 import argparse
 import scipy.special
 import math
 import random
 import time
-from threading import Thread, Event
+import signal
 
 DW = 50
 """Threshold distance determining the interaction with the walls."""
@@ -74,6 +74,7 @@ SPOT_DISTANCE_THRESHOLD = 50
 
 FISH_DISTANCE_THRESHOLD = 50
 
+MAXIMUM_TURNING_ANGLE = math.pi / 2
 
 ## python 2.x quircks ...
 perceivedObjects = []
@@ -82,7 +83,7 @@ currentObjectRun_OnFlag = False
 sumSolidAngles = 0
 
 
-class SchoolingVisual (Thread):
+class SchoolingVisual:
     """
     Fish controller based on Bertrand's model.
 
@@ -108,10 +109,8 @@ class SchoolingVisual (Thread):
     then converted to left and right motor velocities.
     """
 
-    def __init__ (self, fish_name, event):
-
-        Thread.__init__(self)
-        self.stopped = event
+    def __init__ (self, fish_name):
+        """Construct a fish object that is going to control the given fish."""
 
         self._fish = fish.Fish (name = fish_name)
 
@@ -393,18 +392,20 @@ class SchoolingVisual (Thread):
         return (perceivedObjects, sumSolidAngles)
     
     def run (self):
-        """Main function that runs the fish behaviour"""
-        # Run update every Td
-        while not self.stopped.wait (self.Td):
+        """Main function that runs the fish behaviour."""
+        while True:
+            # Run update every Td
+            time.sleep (self.Td)
             self.update ()
-        self._cleanup ()
 
     def _cleanup (self):
-        # Stop the fish
         self._fish.set_vel (0.0, 0.0)
-        self.state = IDLE
-        print ('Stopping...')
 
+def cleanup (signal, frame):
+    """Signal handler to finish the program cleanly."""
+    schooling._cleanup ()
+    print ('Stopping...')
+    sys.exit (0)
     
 
 if __name__ == '__main__':
@@ -418,26 +419,13 @@ if __name__ == '__main__':
         default = 'Fish-001')
     args = parser.parse_args ()
 
-    stop_flag = Event ()
-    
-    print("Press ENTER to stop the program at any time.")
     for i in range (2, 0, -1):
         print 'The fish controller will start in {0} seconds...\r'.format (i),
         sys.stdout.flush ()
         time.sleep (1)
     print ('\n')
 
-    schooling = SchoolingVisual (args.fish_name, stop_flag)
-    schooling.start ()
-
-    # Python 2to3 workaround
-    try:
-        input = raw_input
-    except NameError:
-        pass
-    input("\n")
-
-    stop_flag.set()
-
-
-    
+    signal.signal (signal.SIGINT, cleanup)
+    signal.signal (signal.SIGTERM, cleanup)
+    schooling = SchoolingVisual (args.fish_name)
+    schooling.run ()
