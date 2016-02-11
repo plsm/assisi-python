@@ -70,6 +70,15 @@ ACC_L = 19
 VIBE_ACT = 20
 """ Vibration actuator """
 
+VIBRATION_BACK = 21
+""" Vibration sensor in the back, 180° """
+VIBRATION_FRONT = 22
+""" Vibration sensor in the front, 0° """
+VIBRATION_RIGHT = 23
+""" Vibration sensor in the right, 270° """
+VIBRATION_LEFT = 24
+""" Vibration sensor in the left, 90° """
+
 TEMP_MIN = 10
 """
 Minimum allowed setpoint for the Peltier heater, in °C.
@@ -405,45 +414,51 @@ class Casu:
         self.__write_to_log(["speaker_freq_pwm", time.time(), freq, intens])
 
 
-    def set_motor_vibration(self, intens, id = VIBE_ACT):
+    def set_motor_vibration(self, frequency, amplitude, id = VIBE_ACT):
         """
-        Sets intens value (0-100) to the vibration motor.
+        Sets intens value (0-100) to the vibration motor and frequency of the vibration motor.
 
         :param float : Motor intens value , between 0 and 100 %.
         """
-        if intens < 0:
-            intens = 0
-            print('Motor intens value limited to {0}!'.format(intens))
-        elif intens > 100:
-            intens = 100
-            print('Motor intens value limited to {0}!'.format(intens))
+        if amplitude < 0:
+            amplitude = 0
+            print('Motor intens value limited to {0}!'.format(amplitude))
+        elif amplitude > 100:
+            amplitude = 100
+            print('Motor intens value limited to {0}!'.format(amplitude))
 
         vibration = dev_msgs_pb2.VibrationSetpoint()
-        vibration.freq = 0
-        vibration.amplitude = intens
+        vibration.freq = frequency
+        vibration.amplitude = amplitude
         self.__pub.send_multipart([self.__name, "VibeMotor", "On",
                                    vibration.SerializeToString()])
-        self.__write_to_log(["vibe_intens", time.time(), intens])
+        self.__write_to_log(["vibe_intens", time.time(), amplitude])
 
-    def get_vibration_freq(self, id):
+    def get_vibration_frequency (self, id):
         """
         Returns the vibration frequency of actuator id.
-
-        .. note::
-
-           NOT implemented!
         """
-        pass
+        result = None
+        with self.__lock:
+            if self.__acc_readings.reading:
+                if id == ARRAY:
+                    result = [r.freq for r in self.__acc_readings.reading]
+                else:
+                    result = self.__acc_readings.reading [id - VIBRATION_BACK].freq
+        return result
 
     def get_vibration_amplitude(self, id):
         """
         Returns the vibration amplitude reported by sensor id.
-
-        .. note::
-
-           NOT implemented!
         """
-        pass
+        result = None
+        with self.__lock:
+            if self.__acc_readings.reading:
+                if id == ARRAY:
+                    result = [r.amplitude for r in self.__acc_readings.reading]
+                else:
+                    result = self.__acc_readings.reading [id - VIBRATION_BACK].amplitude
+        return result
 
     def vibration_standby(self, id  = VIBE_ACT):
         """

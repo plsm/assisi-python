@@ -62,10 +62,29 @@ LIGHT_SENSOR = 5
 Light sensor 
 """
 
-
 TEMP_SENSOR = 6
 """
 Temperature sensor 
+"""
+
+VIBRATION_BACK = 7
+"""
+Vibration sensor in the back
+"""
+
+VIBRATION_FRONT = 8
+"""
+Vibration sensor in the front
+"""
+
+VIBRATION_RIGHT = 9
+"""
+Vibration sensor in the right
+"""
+
+VIBRATION_LEFT = 10
+"""
+Vibration sensor in the left
 """
 
 ARRAY = 10000
@@ -109,6 +128,7 @@ class Bee:
         self.__temp_readings = dev_msgs_pb2.TemperatureArray()
         self.__vel_setpoints = dev_msgs_pb2.DiffDrive()
         self.__color_setpoint = base_msgs_pb2.ColorStamped()
+        self.__acc_readings = dev_msgs_pb2.VibrationReadingArray()
         self.__airflow_reading = dev_msgs_pb2.AirflowReading()
 
         # Create the data update thread
@@ -190,6 +210,14 @@ class Bee:
                         self.__color_setpoint.ParseFromString(data)
                 else:
                     print('Unknown command {0} for Bee {1}'.format(cmd, self.__name))
+
+            ### Vibration sensors ###
+            elif dev == 'Acc':
+                if cmd == 'Measurements':
+                    with self.__lock:
+                        self.__acc_readings.ParseFromString(data)
+                else:
+                    print ('Unknown vibration command {0} for Bee {1}'.format (cmd, self.__name))
 
             ### Air flow sensor ###
             elif dev == 'Airflow':
@@ -273,13 +301,27 @@ class Bee:
         """
         Returns the vibration frequency of sensor id.
         """
-        pass
+        result = None
+        with self.__lock:
+            if self.__acc_readings.reading:
+                if id == ARRAY:
+                    result = [r.freq for r in self.__acc_readings.reading]
+                else:
+                    result = self.__acc_readings.reading [id - VIBRATION_BACK].freq
+        return result
 
     def get_vibration_amplitude(self, id):
         """
         Returns the vibration amplitude of sensor id.
         """
-        pass
+        result = None
+        with self.__lock:
+            if self.__acc_readings.reading:
+                if id == ARRAY:
+                    result = [r.amplitude for r in self.__acc_readings.reading]
+                else:
+                    result = self.__acc_readings.reading [id - VIBRATION_BACK].amplitude
+        return result
 
     def get_light_rgb(self, id = LIGHT_SENSOR):
         """
