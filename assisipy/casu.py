@@ -460,6 +460,19 @@ class Casu:
                     result = self.__acc_readings.reading [id - VIBRATION_BACK].amplitude
         return result
 
+    def get_vibration_source (self, id):
+        """
+        Returns the name of the object responsible for a vibration measure.
+        """
+        result = None
+        with self.__lock:
+            if self.__acc_readings.reading:
+                if id == ARRAY:
+                    result = [r.source for r in self.__acc_readings.reading]
+                else:
+                    result = self.__acc_readings.reading [id - VIBRATION_BACK].source
+        return result
+
     def vibration_standby(self, id  = VIBE_ACT):
         """
         Turn the vibration actuators (bot motor and speaker) off.
